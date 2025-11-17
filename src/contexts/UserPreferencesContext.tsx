@@ -17,24 +17,23 @@ const UserPreferencesContext = createContext<UserPreferencesContextType | undefi
 const STORAGE_KEY = "user_preferences";
 
 export function UserPreferencesProvider({ children }: { children: ReactNode }) {
-  console.log('[UserPreferencesProvider] Initializing');
   const [preferences, setPreferences] = useState<UserPreferences>({
     navigationStyle: "sidebar",
   });
-  const [loading, setLoading] = useState(false); // Changed to false by default
+  const [loading, setLoading] = useState(true);
 
   // Load preferences from localStorage on mount
   useEffect(() => {
-    console.log('[UserPreferencesProvider] useEffect running');
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
         const parsed = JSON.parse(stored);
-        console.log('[UserPreferencesProvider] Loaded preferences from storage:', parsed);
         setPreferences(parsed);
-      } catch (error) {
-        console.error("Error loading preferences:", error);
       }
+    } catch (error) {
+      console.error("Error loading preferences:", error);
+    } finally {
+      setLoading(false);
     }
   }, []);
 

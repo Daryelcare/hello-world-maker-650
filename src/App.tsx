@@ -10,7 +10,6 @@ import { CompanyProvider } from "@/contexts/CompanyContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { PermissionsProvider } from "@/contexts/PermissionsContext";
 import { EmployeeAuthProvider } from "@/contexts/EmployeeAuthContext";
-import { UserPreferencesProvider } from "@/contexts/UserPreferencesContext";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import { EmployeeProtectedRoute } from "@/components/layout/EmployeeProtectedRoute";
 import { useActivitySync, useRoutePrefetching } from "@/hooks/useActivitySync";
@@ -178,16 +177,14 @@ const App = () => (
       <AuthProvider>
         <PermissionsProvider>
           <CompanyProvider>
-            <UserPreferencesProvider>
-              <TooltipProvider>
-                <Toaster />
-                <Sonner />
-                <BrowserRouter>
-                  <AppContent />
-                </BrowserRouter>
-                <ReactQueryDevtools initialIsOpen={false} />
-              </TooltipProvider>
-            </UserPreferencesProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <AppContent />
+              </BrowserRouter>
+              <ReactQueryDevtools initialIsOpen={false} />
+            </TooltipProvider>
           </CompanyProvider>
         </PermissionsProvider>
       </AuthProvider>
