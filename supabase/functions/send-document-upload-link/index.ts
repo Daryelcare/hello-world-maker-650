@@ -46,8 +46,9 @@ serve(async (req) => {
       throw tokenError;
     }
 
-    // Generate upload link
-    const uploadLink = `${Deno.env.get('SITE_URL') || 'http://localhost:5173'}/document-upload?token=${token}`;
+    // Generate upload link using request origin
+    const siteOrigin = req.headers.get("origin") || `${new URL(req.url).protocol}//${new URL(req.url).host}`;
+    const uploadLink = `${siteOrigin}/document-upload?token=${token}`;
 
     // Get email settings using RPC
     const { data: emailSettings, error: settingsError } = await supabase.rpc('get_email_settings');

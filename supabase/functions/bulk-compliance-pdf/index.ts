@@ -3,6 +3,23 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { PDFDocument, rgb } from 'https://esm.sh/pdf-lib@1.17.1';
 import fontkit from 'https://esm.sh/@pdf-lib/fontkit@1.1.1';
+
+interface ComplianceRecord {
+  id: string;
+  employee: { name: string; branch: string; branch_id?: string };
+  compliance_type: { name: string; frequency: string };
+  period_identifier: string;
+  completion_date: string;
+  completion_method?: string;
+  notes?: string;
+  form_data?: any;
+}
+
+interface DrawTextOptions {
+  bold?: boolean;
+  size?: number;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
@@ -57,21 +74,20 @@ serve(async (req)=>{
     }
     console.log(`Found ${records.length} compliance records`);
     // Group records by branch
-    const recordsByBranch = records.reduce((acc, record)=>{
+    const recordsByBranch = records.reduce<Record<string, ComplianceRecord[]>>((acc, record) => {
       const branchName = record.employee?.branch || 'Unknown Branch';
       if (!acc[branchName]) {
         acc[branchName] = [];
       }
-      acc[branchName].push(record);
+      acc[branchName].push(record as ComplianceRecord);
       return acc;
     }, {});
     // Create ZIP file structure
     const zipEntries = [];
     // Process each branch
     for (const [branchName, branchRecords] of Object.entries(recordsByBranch)){
-      const typedRecords = branchRecords as any[];
-      console.log(`Processing branch: ${branchName} with ${typedRecords.length} records`);
-      for (const record of typedRecords){
+      console.log(`Processing branch: ${branchName} with ${branchRecords.length} records`);
+      for (const record of branchRecords){
         try {
           let pdfBytes;
           // Determine PDF generation method based on completion_method
@@ -107,10 +123,10 @@ serve(async (req)=>{
         'Content-Disposition': `attachment; filename="${zipFileName}"`
       }
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in bulk-compliance-pdf function:', error);
     return new Response(JSON.stringify({
-      error: error.message
+      error: error instanceof Error ? error.message : 'Unknown error'
     }), {
       status: 500,
       headers: {
@@ -120,7 +136,7 @@ serve(async (req)=>{
     });
   }
 });
-async function generateQuestionnairePdf(record: any, company: any, supabaseClient: any) {
+async function generateQuestionnairePdf(record: ComplianceRecord, company: any, supabaseClient: any) {
   // Fetch questionnaire responses
   const { data: responses } = await supabaseClient.from('compliance_questionnaire_responses').select(`
       *,
@@ -148,7 +164,7 @@ async function generateQuestionnairePdf(record: any, company: any, supabaseClien
   const lineHeight = 16;
   let y = page.getHeight() - margin;
   // Helper functions
-  const drawText = (text: string, opts: any = {})=>{
+  const drawText = (text: string, opts: DrawTextOptions = {}) => {
     const f = opts?.bold ? boldFont : font;
     const size = opts?.size ?? 11;
     page.drawText(text || '', {
@@ -188,7 +204,7 @@ async function generateQuestionnairePdf(record: any, company: any, supabaseClien
       size: 12
     });
     addSpacer(5);
-    responses.responses.forEach((response: any)=>{
+    responses.responses.forEach((response: { question_id: string; response_value?: string }) => {
       let responseValue = '';
       if (response.response_value) {
         try {
@@ -212,7 +228,7 @@ async function generateQuestionnairePdf(record: any, company: any, supabaseClien
   }
   return await doc.save();
 }
-async function generateBasicCompliancePdf(record: any, company: any) {
+async function generateBasicCompliancePdf(record: ComplianceRecord, company: any) {
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
   // Load fonts
@@ -232,7 +248,7 @@ async function generateBasicCompliancePdf(record: any, company: any) {
   const margin = 40;
   const lineHeight = 16;
   let y = page.getHeight() - margin;
-  const drawText = (text: string, opts: any = {})=>{
+  const drawText = (text: string, opts: DrawTextOptions = {}) => {
     const f = opts?.bold ? boldFont : font;
     const size = opts?.size ?? 11;
     page.drawText(text || '', {
@@ -270,16 +286,16 @@ async function generateBasicCompliancePdf(record: any, company: any) {
   }
   return await doc.save();
 }
-async function createZipFile(entries: any[]) {
+async function createZipFile(entries: Array<{ name: string; content: Uint8Array }>) {
   // Simple ZIP file creation
   // This is a basic implementation - for production, consider using a proper ZIP library
-  const files = entries.map((entry: any)=>({
+  const files = entries.map((entry) => ({
       name: entry.name,
       data: entry.content
     }));
   // Create a simple ZIP-like structure
   let totalSize = 0;
-  const fileHeaders = files.map((file: any)=>{
+  const fileHeaders = files.map((file: { name: string; data: Uint8Array }) => {
     const header = new TextEncoder().encode(`${file.name}\n`);
     totalSize += header.length + file.data.length + 4; // 4 bytes for length prefix
     return {
