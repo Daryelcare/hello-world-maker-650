@@ -17,7 +17,8 @@ import {
   AlertCircle,
   Star,
   ImageIcon,
-  FileText
+  FileText,
+  Trash2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -176,6 +177,56 @@ export function UploadedDocumentsView({ applicationId }: UploadedDocumentsViewPr
       toast({
         title: "Download Failed",
         description: "Could not download document",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteDocument = async (doc: UploadedDocument) => {
+    if (!tokenInfo) return;
+
+    try {
+      // Extract storage path from the full URL
+      const urlObj = new URL(doc.uploadedUrl);
+      const pathMatch = urlObj.pathname.match(/\/applicant-documents\/(.+)$/);
+      
+      if (pathMatch) {
+        const storagePath = pathMatch[1];
+        
+        // Delete from storage
+        const { error: storageError } = await supabase.storage
+          .from('applicant-documents')
+          .remove([storagePath]);
+
+        if (storageError) {
+          console.error('Storage deletion error:', storageError);
+        }
+      }
+
+      // Update database - remove this document from the array
+      const updatedDocs = (tokenInfo.documents_uploaded || []).filter(
+        (d: any) => d.url !== doc.uploadedUrl && d.type !== doc.type
+      );
+
+      const { error: dbError } = await supabase
+        .from('document_upload_tokens')
+        .update({ documents_uploaded: updatedDocs })
+        .eq('id', tokenInfo.id);
+
+      if (dbError) throw dbError;
+
+      // Refresh the view
+      await fetchDocuments();
+
+      toast({
+        title: "Document Deleted",
+        description: `${doc.type} has been removed`,
+      });
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast({
+        title: "Delete Failed",
+        description: "Could not delete document",
         variant: "destructive",
       });
     }
@@ -446,6 +497,15 @@ export function UploadedDocumentsView({ applicationId }: UploadedDocumentsViewPr
                         onClick={() => downloadDocument(doc)}
                       >
                         <Download className="w-4 h-4" />
+                      </Button>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => deleteDocument(doc)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
